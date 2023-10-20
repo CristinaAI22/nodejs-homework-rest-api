@@ -5,22 +5,17 @@ const Joi = require("joi");
 
 const contactsPath = path.join(__dirname, "contacts.json");
 
-const schema = Joi.object({
-  name: Joi.string().alphanum().min(3).max(30).required(),
-  email: Joi.string().email({
-    minDomainSegments: 2,
-    tlds: { allow: ["com", "net"] },
-  }),
-  phone: Joi.string().pattern(/^[+\d\s-]+$/),
+const contactSchema = Joi.object({
+  name: Joi.string()
+    .min(3)
+    .pattern(/^[A-Za-z\s]+$/)
+    .required(),
+  email: Joi.string().email().required(),
+  phone: Joi.string()
+    .min(3)
+    .pattern(/^[0-9() +-.]+$/)
+    .required(),
 });
-const validateInput = async (input) => {
-  try {
-    await schema.validateAsync(input);
-    return null;
-  } catch (error) {
-    return error.details[0].message;
-  }
-};
 
 const listContacts = async () => {
   try {
@@ -51,53 +46,61 @@ const removeContact = async (contactId) => {
   try {
     const data = await fs.readFile(contactsPath);
     const contacts = JSON.parse(data);
-    const newContacts = contacts.filter((c) => c.id !== contactId);
-    await fs.writeFile(contactsPath, JSON.stringify(newContacts));
-    console.log(newContacts);
-    return { message: "Contact deleted successfully!" };
+    const contactsIndex = contacts.findIndex((c) => c.id === contactId);
+    if (contactsIndex === -1) {
+      return false;
+    }
+    contacts.splice(contactsIndex, 1);
+    await fs.writeFile(contactsPath, JSON.stringify(contacts));
+    return true;
   } catch (error) {
-    console.log(error.message);
+    return false;
   }
 };
-
 const addContact = async (body) => {
   try {
     const { name, email, phone } = body;
-    const validationError = await validateInput({ name, email, phone });
+    const { error, value } = contactSchema.validate({ name, email, phone });
 
-    if (validationError) {
+    if (error) {
       return {
-        statusCode: 400,
-        message: "Validation error: " + validationError,
+        success: false,
+        message: "Validation error: " + error.details[0].message,
       };
     }
     const data = await fs.readFile(contactsPath);
     const contacts = JSON.parse(data);
     const newContact = {
       id: uuidv4(),
-      name,
-      email,
-      phone,
+      name: value.name,
+      email: value.email,
+      phone: value.phone,
     };
     const newContacts = [...contacts, newContact];
     await fs.writeFile(contactsPath, JSON.stringify(newContacts));
-    return { statusCode: 200, message: newContacts };
+    return {
+      success: true,
+      message: "Contact added successfully",
+      data: newContact,
+    };
   } catch (error) {
     console.error(error.message);
+    return { success: false, message: "Error adding contact" };
   }
 };
 
 const updateContact = async (contactId, body) => {
   try {
     const { name, email, phone } = body;
-    const validationError = await validateInput({ name, email, phone });
+    const { error, value } = contactSchema.validate({ name, email, phone });
 
-    if (validationError) {
+    if (error) {
       return {
         statusCode: 400,
-        message: "Validation error: " + validationError,
+        message: "Validation error: " + error.details[0].message,
       };
     }
+
     const data = await fs.readFile(contactsPath);
     const contacts = JSON.parse(data);
     const index = contacts.findIndex((c) => c.id === contactId);
@@ -108,20 +111,43 @@ const updateContact = async (contactId, body) => {
         message: "Contact not found",
       };
     }
-    contacts[index] = {
+    const originalContact = contacts[index];
+    const updatedFields = {};
+
+    if (originalContact.name !== value.name) {
+      updatedFields.name = {
+        oldValue: originalContact.name,
+        newValue: value.name,
+      };
+    }
+    if (originalContact.email !== value.email) {
+      updatedFields.email = {
+        oldValue: originalContact.email,
+        newValue: value.email,
+      };
+    }
+    if (originalContact.phone !== value.phone) {
+      updatedFields.phone = {
+        oldValue: originalContact.phone,
+        newValue: value.phone,
+      };
+    }
+    const updatedContact = {
       id: contactId,
-      name,
-      email,
-      phone,
+      name: value.name,
+      email: value.email,
+      phone: value.phone,
     };
+    contacts[index] = updatedContact;
     await fs.writeFile(contactsPath, JSON.stringify(contacts));
-    return { statusCode: 200, message: "Contact updated successfully!" };
+    return {
+      success: true,
+      message: "Contact updated successfully",
+      updatedFields: updatedFields,
+    };
   } catch (error) {
     console.error(error.message);
-    return {
-      statusCode: 500,
-      message: "Internal Server Error",
-    };
+    return { success: false, message: "Internal Server Error" };
   }
 };
 

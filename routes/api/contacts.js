@@ -10,15 +10,11 @@ const {
   updateContact,
 } = require("../../models/contacts");
 
-router.get("/test", (req, res) => {
-  res.send("This is a test route.");
-});
-
 router.get("/", async (req, res, next) => {
   try {
     const result = await listContacts();
-    if (result.statusCode === 200) {
-      return res.status(200).json(result.message);
+    if (result) {
+      return res.status(200).json(result);
     }
   } catch (error) {
     next(error);
@@ -40,19 +36,14 @@ router.get("/:contactId", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
   const { name, email, phone } = req.body;
-  if (!name || !email || !phone) {
-    return res
-      .status(400)
-      .json({ message: "Missing required name, email, or phone field" });
-  }
+
   try {
     const result = await addContact({ name, email, phone });
 
-    if (result.statusCode === 400) {
+    if (result.success) {
+      return res.status(201).json(result);
+    } else {
       return res.status(400).json(result);
-    }
-    if (result.statusCode === 201) {
-      return res.status(201).json(result.message);
     }
   } catch (error) {
     next(error);
@@ -60,16 +51,15 @@ router.post("/", async (req, res, next) => {
 });
 
 router.delete("/:contactId", async (req, res, next) => {
-  const { id } = req.params;
+  const { contactId } = req.params;
 
   try {
-    const result = await removeContact(id);
+    const result = await removeContact(contactId);
 
-    if (result.statusCode === 200) {
+    if (result) {
       return res.status(200).json({ message: "Contact deleted" });
-    }
-    if (result.statusCode === 404) {
-      return res.status(404).json({ message: "Not found" });
+    } else {
+      return res.status(404).json({ message: "Contact not found" });
     }
   } catch (error) {
     next(error);
@@ -77,21 +67,15 @@ router.delete("/:contactId", async (req, res, next) => {
 });
 
 router.put("/:contactId", async (req, res, next) => {
-  const { id } = req.params;
+  const { contactId } = req.params;
   const { name, email, phone } = req.body;
-  if (!name && !email && !phone) {
-    return res.status(400).json({ message: "Missing fields" });
-  }
   try {
-    const updatedFields = { name, email, phone };
-    const result = await updateContact(id, updatedFields);
+    const result = await updateContact(contactId, { name, email, phone });
 
-    if (result.statusCode === 200) {
-      return res.status(200).json(result.message);
-    }
-
-    if (result.statusCode === 404) {
-      return res.status(404).json({ message: "Not found" });
+    if (result.success) {
+      return res.json(result);
+    } else {
+      return res.status(400).json(result);
     }
   } catch (error) {
     next(error);

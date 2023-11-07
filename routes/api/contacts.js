@@ -8,11 +8,13 @@ const {
   removeContact,
   addContact,
   updateContact,
+  updateStatusContact,
 } = require("../../models/contacts");
 
 router.get("/", async (req, res, next) => {
   try {
     const result = await listContacts();
+    console.log(result);
     if (result) {
       return res.status(200).json(result);
     }
@@ -71,6 +73,23 @@ router.put("/:contactId", async (req, res, next) => {
   const { name, email, phone } = req.body;
   try {
     const result = await updateContact(contactId, { name, email, phone });
+
+    if (result.success) {
+      return res.json(result);
+    } else {
+      return res.status(400).json(result);
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/:contactId/favorite", async (req, res, next) => {
+  const { contactId } = req.params;
+  const { favorite } = req.body;
+
+  try {
+    const result = await updateStatusContact(contactId, { favorite });
 
     if (result.success) {
       return res.json(result);

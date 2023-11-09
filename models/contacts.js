@@ -11,6 +11,7 @@ const contactSchema = Joi.object({
     .min(3)
     .pattern(/^[0-9() +-.]+$/)
     .required(),
+  favorite: Boolean,
 });
 
 const listContacts = async () => {
@@ -37,22 +38,39 @@ const getContactById = async (contactId) => {
   }
 };
 
+// const removeContact = async (contactId) => {
+//   try {
+//     const contact = await Contact.findByIdAndRemove(contactId);
+//     console.log(contact);
+//     if (contact) {
+//       return true;
+//     } else {
+//       return false;
+//     }
+//   } catch (error) {
+//     return false;
+//   }
+// };
 const removeContact = async (contactId) => {
   try {
-    const contact = await Contact.findByIdAndRemove(contactId);
-    if (contact) {
-      return true;
-    } else {
-      return false;
+    const resp = await Contact.findByIdAndRemove(contactId);
+    if (!resp) {
+      return { message: "the provided ID does not exist" };
     }
+    return { message: "contact deleted" };
   } catch (error) {
-    return false;
+    console.log(error.message);
   }
 };
 const addContact = async (body) => {
   try {
-    const { name, email, phone } = body;
-    const { error, value } = contactSchema.validate({ name, email, phone });
+    const { name, email, phone, favorite } = body;
+    const { error, value } = contactSchema.validate({
+      name,
+      email,
+      phone,
+      favorite,
+    });
 
     if (error) {
       return {
@@ -65,6 +83,7 @@ const addContact = async (body) => {
       name: value.name,
       email: value.email,
       phone: value.phone,
+      favorite: value.favorite,
     });
 
     return {
@@ -138,33 +157,21 @@ const updateContact = async (contactId, body) => {
     return { success: false, message: "Internal Server Error" };
   }
 };
-const updateStatusContact = async (req, res) => {
-  const { contactId } = req.params;
-  const { favorite } = req.body;
-
-  if (typeof favorite === "undefined") {
-    return res.status(400).json({ message: "missing field favorite" });
-  }
-
+const updateStatusContact = async (contactId, body) => {
   try {
-    const updatedContact = await Contact.findByIdAndUpdate(
+    const contact = await Contact.findByIdAndUpdate(
       contactId,
-      { favorite },
+      { favorite: body.favorite },
       { new: true }
     );
 
-    if (!updatedContact) {
-      return res.status(404).json({ message: "Not found" });
+    if (!contact) {
+      return { success: false };
     }
-
-    return res.status(200).json({
-      success: true,
-      message: "Favorite status updated successfully",
-      updatedFields: { favorite: favorite },
-    });
+    return { success: true, data: contact };
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error(error.message);
+    return { success: false };
   }
 };
 

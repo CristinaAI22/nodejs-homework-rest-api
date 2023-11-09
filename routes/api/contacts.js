@@ -11,19 +11,13 @@ const {
   updateStatusContact,
 } = require("../../models/contacts");
 
-router.get("/", async (req, res, next) => {
-  try {
-    const result = await listContacts();
-    console.log(result);
-    if (result) {
-      return res.status(200).json(result);
-    }
-  } catch (error) {
-    next(error);
-  }
+router.get("/contacts", async (req, res, next) => {
+  res.status(200);
+  const data = await listContacts();
+  res.json(data);
 });
 
-router.get("/:contactId", async (req, res, next) => {
+router.get("/contacts/:contactId", async (req, res, next) => {
   const { contactId } = req.params;
   try {
     const contact = await getContactById(contactId);
@@ -36,11 +30,11 @@ router.get("/:contactId", async (req, res, next) => {
   }
 });
 
-router.post("/", async (req, res, next) => {
-  const { name, email, phone } = req.body;
+router.post("/contacts", async (req, res, next) => {
+  const contactToCreate = req.body;
 
   try {
-    const result = await addContact({ name, email, phone });
+    const result = await addContact(contactToCreate);
 
     if (result.success) {
       return res.status(201).json(result);
@@ -52,11 +46,12 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-router.delete("/:contactId", async (req, res, next) => {
+router.delete("/contacts/:contactId", async (req, res, next) => {
   const { contactId } = req.params;
 
   try {
     const result = await removeContact(contactId);
+    console.log(result);
 
     if (result) {
       return res.status(200).json({ message: "Contact deleted" });

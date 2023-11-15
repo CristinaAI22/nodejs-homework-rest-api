@@ -10,6 +10,15 @@ const {
   updateContact,
   updateStatusContact,
 } = require("../../models/contacts");
+const {
+  signupUser,
+  loginUser,
+  auth,
+  logOutUser,
+  addUserContact,
+  getUserContacts,
+} = require("../../models/users");
+const { User } = require("../../models/User");
 
 router.get("/contacts", async (req, res, next) => {
   res.status(200);
@@ -93,6 +102,74 @@ router.patch("/:contactId/favorite", async (req, res, next) => {
     }
   } catch (error) {
     next(error);
+  }
+});
+
+router.post("/users/signup", async (req, res) => {
+  const body = req.body;
+  const data = await signupUser(body);
+  const { statusCode, message } = data;
+  res.status(statusCode).json(message);
+});
+
+router.post("/users/login", async (req, res) => {
+  const body = req.body;
+  const data = await loginUser(body);
+  const { statusCode, message } = data;
+  res.status(statusCode).json(message);
+});
+
+router.get("/users/logout", logOutUser, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+    user.token = null;
+    await user.save();
+    return res.status(204).send();
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+router.get("/users/current", auth, (req, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+    const responseBody = {
+      email: user.email,
+      subscription: user.subscription,
+    };
+    return res.status(200).json({ ResponseBody: responseBody });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+router.post("/users/contacts", auth, async (req, res) => {
+  try {
+    const user = req.user;
+    const contactToAdd = req.body;
+    const newContact = await addUserContact(user, contactToAdd);
+    return res
+      .status(newContact.statusCode)
+      .json({ message: newContact.message });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+router.get("/users/contacts", auth, async (req, res) => {
+  try {
+    const user = req.user;
+    const newContact = await getUserContacts(user);
+    return res
+      .status(newContact.statusCode)
+      .json({ message: newContact.message });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 });
 

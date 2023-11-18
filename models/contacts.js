@@ -38,28 +38,18 @@ const getContactById = async (contactId) => {
   }
 };
 
-// const removeContact = async (contactId) => {
-//   try {
-//     const contact = await Contact.findByIdAndRemove(contactId);
-//     console.log(contact);
-//     if (contact) {
-//       return true;
-//     } else {
-//       return false;
-//     }
-//   } catch (error) {
-//     return false;
-//   }
-// };
 const removeContact = async (contactId) => {
   try {
-    const resp = await Contact.findByIdAndRemove(contactId);
-    if (!resp) {
-      return { message: "the provided ID does not exist" };
+    const resp = await Contact.deleteOne({ _id: contactId });
+
+    if (resp.deletedCount === 0) {
+      return { message: "The provided ID does not exist" };
     }
-    return { message: "contact deleted" };
+
+    return { message: "Contact deleted!" };
   } catch (error) {
-    console.log(error.message);
+    console.error(error.message);
+    throw error;
   }
 };
 const addContact = async (body) => {
@@ -118,6 +108,7 @@ const updateContact = async (contactId, body) => {
       },
       { new: true }
     );
+    console.log(contactId);
 
     if (!contact) {
       return {

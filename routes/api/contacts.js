@@ -17,6 +17,8 @@ const {
   logOutUser,
   addUserContact,
   getUserContacts,
+  upload,
+  updateAvatar,
 } = require("../../models/users");
 const { User } = require("../../models/User");
 
@@ -60,12 +62,13 @@ router.delete("/contacts/:contactId", async (req, res, next) => {
 
   try {
     const result = await removeContact(contactId);
-    console.log(result);
 
-    if (result) {
-      return res.status(200).json({ message: "Contact deleted" });
-    } else {
+    if (result.message === "Contact deleted!") {
+      return res.status(200).json({ message: "Contact deleted successfully" });
+    } else if (result.message === "The provided ID does not exist") {
       return res.status(404).json({ message: "Contact not found" });
+    } else {
+      return res.status(500).json({ message: "Internal Server Error" });
     }
   } catch (error) {
     next(error);
@@ -172,5 +175,26 @@ router.get("/users/contacts", auth, async (req, res) => {
     return res.status(500).json({ message: "Internal Server Error" });
   }
 });
+router.patch(
+  "/users/avatars",
+  auth,
+  upload.single("avatar"),
+  async (req, res, next) => {
+    try {
+      const user = req.user;
+      console.log(User);
+
+      const file = req.file;
+      console.log(file);
+
+      const data = await updateAvatar(user, file);
+      console.log(data);
+      res.status(data.statusCode).json({ avatarURL: data.message });
+    } catch (err) {
+      console.log(err);
+      res.status(400).json({ message: "Bad request" });
+    }
+  }
+);
 
 module.exports = router;

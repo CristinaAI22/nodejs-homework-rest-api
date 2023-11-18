@@ -5,6 +5,12 @@ require("./config-passport");
 const jwt = require("jsonwebtoken");
 const passport = require("passport");
 const SECRET = process.env.SECRET;
+const gravatar = require("gravatar");
+const multer = require("multer");
+const jimp = require("jimp");
+const path = require("path");
+const uploadDir = path.join(process.cwd(), "tmp");
+const storeImage = path.join(process.cwd(), "public", "avatars");
 
 const signupUser = async (body) => {
   try {
@@ -19,8 +25,8 @@ const signupUser = async (body) => {
       console.error(error.message);
       return { statusCode: 400, message: `Bad Request: ${error.message} ` };
     }
-
-    const createdUser = new User({ email, password });
+    const avatarURL = gravatar.url(email);
+    const createdUser = new User({ email, password, avatarURL });
     createdUser.setPass(password);
     await createdUser.save();
     return { statusCode: 201, message: createdUser };
@@ -79,7 +85,7 @@ const auth = (req, res, next) => {
 const logOutUser = (req, res, next) => {
   const token = req.headers.authorization;
   if (!token) {
-    return res.status(401).json({ message: "Not authorized" });
+    return res.status(401).json({ message: "Not authorized!!!" });
   }
 
   try {
@@ -116,6 +122,51 @@ const getUserContacts = async (user) => {
   }
 };
 
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, file.originalname);
+  },
+  limits: {
+    fileSize: 1048576,
+  },
+});
+console.log(storeImage);
+
+const upload = multer({
+  storage: storage,
+});
+
+const updateAvatar = async (user, file) => {
+  try {
+    if (!user) {
+      return { statusCode: 401, message: "Not authorized" };
+    }
+
+    const image = await jimp.read(file.path);
+    image.resize(250, 250);
+    const fileExt = path.extname(file.originalname);
+    const uniqueFileName = `${user.email.replace(
+      /[^a-zA-Z0-9]/g,
+      ""
+    )}${Date.now()}${fileExt}`;
+    const avatarPath = path.join(
+      process.cwd(),
+      "public",
+      "avatars",
+      uniqueFileName
+    );
+    image.write(avatarPath);
+    user.avatarURL = `/avatars/${uniqueFileName}`;
+    await user.save();
+    return { statusCode: 200, message: user.avatarURL };
+  } catch (err) {
+    return { statusCode: 400, message: "Bad request" };
+  }
+};
+
 module.exports = {
   signupUser,
   loginUser,
@@ -123,4 +174,6 @@ module.exports = {
   logOutUser,
   addUserContact,
   getUserContacts,
+  upload,
+  updateAvatar,
 };

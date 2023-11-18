@@ -19,6 +19,7 @@ const {
   getUserContacts,
   upload,
   updateAvatar,
+  resendVerificationEmail,
 } = require("../../models/users");
 const { User } = require("../../models/User");
 
@@ -196,5 +197,30 @@ router.patch(
     }
   }
 );
+router.get("/users/verify/:verificationToken", async (req, res) => {
+  const { verificationToken } = req.params;
+
+  try {
+    const user = await User.findOne({ verificationToken });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    user.verificationToken = null;
+    user.verify = true;
+    await user.save();
+
+    return res.status(200).json({ message: "Verification successful" });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+router.post("/users/verify", async (req, res) => {
+  const { email } = req.body;
+  const data = await resendVerificationEmail(email);
+  const { statusCode, message } = data;
+  res.status(statusCode).json(message);
+});
 
 module.exports = router;

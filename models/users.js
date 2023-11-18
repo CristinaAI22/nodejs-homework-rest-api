@@ -11,28 +11,78 @@ const jimp = require("jimp");
 const path = require("path");
 const uploadDir = path.join(process.cwd(), "tmp");
 const storeImage = path.join(process.cwd(), "public", "avatars");
+const nodemailer = require("nodemailer");
+const uuid = require("uuid");
 
+const transporter = nodemailer.createTransport({
+  host: "smtp.office365.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.OUTLOOK_EMAIL,
+    pass: process.env.OUTLOOK_PASSWORD,
+  },
+});
+const resendVerificationEmail = async (email, verificationToken) => {
+  const mailOptions = {
+    from: process.env.OUTLOOK_EMAIL,
+    to: email,
+    subject: "Resend Email Verification",
+    text: `Click the following link to verify your email: http://localhost:27017/users/verify/${verificationToken}`,
+  };
+
+  await transporter.sendMail(mailOptions);
+};
 const signupUser = async (body) => {
   try {
     const { email, password } = body;
     const user = await User.findOne({ email });
+
     if (user) {
-      return { statusCode: 409, message: "Email is already in use" };
+      if (user.verify) {
+        return { statusCode: 400, message: "User is already verified" };
+      }
+      await resendVerificationEmail(email, user.verificationToken);
+
+      return {
+        statusCode: 200,
+        message: "Verification email resent. Check your inbox.",
+      };
     }
+
     const { error } = userSchema.validate(body);
 
     if (error) {
       console.error(error.message);
       return { statusCode: 400, message: `Bad Request: ${error.message} ` };
     }
+
+    const verificationToken = uuid.v4();
     const avatarURL = gravatar.url(email);
-    const createdUser = new User({ email, password, avatarURL });
+    const createdUser = new User({
+      email,
+      password,
+      avatarURL,
+      verificationToken,
+    });
+
     createdUser.setPass(password);
     await createdUser.save();
-    return { statusCode: 201, message: createdUser };
+
+    await transporter.sendMail({
+      from: process.env.OUTLOOK_EMAIL,
+      to: email,
+      subject: "Email Verification",
+      text: `Click the following link to verify your email: http://localhost:27017/users/verify/${verificationToken}`,
+    });
+
+    return {
+      statusCode: 201,
+      message: "User registered successfully. Verification email sent.",
+    };
   } catch (err) {
-    console.log(err);
-    return { statusCode: 400, message: `Bad Request` };
+    console.error(err.message);
+    return { statusCode: 500, message: "Internal Server Error" };
   }
 };
 
@@ -176,4 +226,5 @@ module.exports = {
   getUserContacts,
   upload,
   updateAvatar,
+  resendVerificationEmail,
 };
